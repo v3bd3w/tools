@@ -1,0 +1,61 @@
+#!/usr/bin/php
+<?php
+define('CONFIG', [
+	"server" => [
+		"ip" => '127.0.0.1',
+		"port" => '8181',
+	],
+]);
+
+function main()
+{//{{{//
+	$ip = CONFIG["server"]["ip"];
+	$port = CONFIG["server"]["port"];
+	$socket = "tcp://{$ip}:{$port}";
+	$error = [
+		"number" => 0, 
+		"string" => '',
+	];
+	$return = stream_socket_server($socket, $error["number"], $error["string"]);
+	if(!is_resource($return)) {//{{{//
+		tirigger_error("Stream: {$error['string']}", E_USER_WARNING);
+		trigger_error("The 'stream_socket_server' returned an error", E_USER_WARNING);
+		return(false);
+	}//}}}//
+	$socket = $return;
+
+	$return = stream_socket_accept($socket);
+	if(!is_resource($return)) {//{{{//
+		trigger_error("The 'stream_socket_accept' returned an error", E_USER_WARNING);
+		return(false);
+	}//}}}//
+	$connection = $return;
+	
+	$data = '';
+	$size = 0x800;
+	while(true) {
+		$return = feof($connection);
+		if($return) break;
+		
+		$return = fread($connection, $size);
+		if(!is_string($return)) {//{{{//
+			trigger_error("The 'fread' returned an error", E_USER_WARNING);
+			return(false);
+		}//}}}//
+		$data .= $return;
+	}
+
+	fclose($connection);
+	fclose($socket);
+	
+	echo($data);
+
+	return(true);
+}//}}}//
+
+$return = main();
+if($return !== true) 
+	exit(255);
+else
+	exit(0);
+

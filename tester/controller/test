@@ -1,0 +1,28 @@
+#!/usr/bin/php
+<?php
+
+require_once(__DIR__.'/Controller.php');
+
+$key = 'yavTosk2';
+$url = 'http://localhost/index.php';
+$Controller = new Controller($key, $url);
+
+if(true) // server
+{//{{{//
+	$return = $Controller->server_create();
+	if(!$return) {//{{{//
+		trigger_error("Can't create server", E_USER_WARNING);
+		return(false);
+	}//}}}//
+
+	system('/usr/bin/php '.__DIR__.'/client.php');
+
+	$return = $Controller->server_destroy();
+	if(!is_string($return)) {//{{{//
+		trigger_error("Can't destroy server", E_USER_WARNING);
+		return(false);
+	}//}}}//
+	$data = $return;
+	var_dump($data);
+	
+}//}}}//

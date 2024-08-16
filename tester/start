@@ -1,0 +1,178 @@
+#!/bin/sh
+#<?php ob_end_clean(); goto start; ?>
+
+WEB_SERVER_ADDRESS="127.0.0.1"
+WEB_SERVER_PORT="8080"
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+# Help block
+#{{{
+
+HELP="
+Description: The script starts the php built-in web server with authorization.
+Usage: ${BASENAME} <user_name>
+"
+
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+#}}}
+
+# Echo functions
+#{{{
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+#}}}
+
+# Change user
+#{{{
+
+UID=`/usr/bin/id -r -u`
+GID=`/usr/bin/id -r -g`
+
+if test $UID -eq 0 -o $GID -eq 0
+then
+
+	if test -z "${1}"
+	then
+		error "User name not set"
+		exit 255
+	fi
+	export WEB_SERVER_USER="${1}"
+	
+	export WEB_SERVER_DOCROOT="${DIR}"
+
+	. ${DIR}/8080/create_key_file.sh
+	create_key_file ${DIR}
+	if test ${?} -ne 0
+		then
+			error "Can't create key file"
+			exit 255
+	fi
+	
+	/usr/bin/su -P -s /bin/sh -l "${WEB_SERVER_USER}"  -w "WEB_SERVER_USER,WEB_SERVER_DOCROOT,KEY" -c ${FILE}
+	exit 0
+fi
+
+#}}}
+
+# Test variables
+#{{{
+
+if test -z "${WEB_SERVER_USER}"
+	then
+	error "'WEB_SERVER_USER' is not set"
+	exit 255
+fi
+
+if test -z "${WEB_SERVER_DOCROOT}"
+	then
+	error "'WEB_SERVER_DOCROOT' is not set"
+	exit 255
+fi
+
+if test -z "${KEY}"
+	then
+	error "'KEY' is not set"
+	exit 255
+fi
+
+#}}}
+
+export WEB_SERVER_PASSWORD=`/usr/bin/apg -n 1 -m 6 -x 6 -M NCL`
+
+/usr/bin/echo "uid: ${UID}, gid: ${GID}"
+/usr/bin/echo "document root: ${WEB_SERVER_DOCROOT}"
+/usr/bin/echo "user: ${WEB_SERVER_USER}"
+/usr/bin/echo "password: ${WEB_SERVER_PASSWORD}"
+
+/usr/bin/php -d auto_prepend_file=${FILE} -t ${WEB_SERVER_DOCROOT} -S ${WEB_SERVER_ADDRESS}:${WEB_SERVER_PORT}
+exit $?
+
+<?php start:
+header("X-Frame-Options: DENY");
+
+$user = getenv('WEB_SERVER_USER', true);
+if(!is_string($user)) {
+	trigger_error("Environment variable 'WEB_SERVER_USER' is not set", E_USER_ERROR);
+	exit(255);
+}
+
+$password = getenv('WEB_SERVER_PASSWORD', true);
+if(!is_string($password)) {
+	trigger_error("Environment variable 'WEB_SERVER_PASSWORD' is not set", E_USER_ERROR);
+	exit(255);
+}
+
+$authorization = function(string $user, string $password)
+{
+	$headers = apache_request_headers();
+	$r = array_key_exists('Authorization', $headers);
+	if ($r !== true) {
+		return(false);
+	}
+	
+	$s = $headers['Authorization'];
+	if (preg_match('/^([^\s]+)\s+([^\s]+)$/', $s, $m) !== 1) {
+		return(false);
+	}
+	$type = $m[1];
+	$credentials = $m[2];
+	
+	if (strcmp($type, 'Basic') !== 0) {
+		return(false);
+	}
+	
+	$s = base64_encode("{$user}:{$password}");
+	if (strcmp($credentials, $s) !== 0) {
+		return(false);
+	}
+	
+	return(true);
+};
+
+$return = $authorization($user, $password);
+if ($return !== true) {
+	http_response_code(401);
+	header('WWW-Authenticate: Basic realm="Access to the php built-in web server", charset="UTF-8"');
+	exit(0);
+}
+
+$return = base64_encode("{$user}:{$password}");
+$return = md5($return);
+define('CSRF_TOKEN', $return);
+
+if(
+	isset($_SERVER["REQUEST_METHOD"])
+	&& is_string($_SERVER["REQUEST_METHOD"])
+	&& $_SERVER["REQUEST_METHOD"] == 'POST'
+) {
+	if(!(
+		isset($_POST['csrf_token'])
+		&& is_string($_POST['csrf_token'])
+		&& strcmp(CSRF_TOKEN, $_POST['csrf_token']) === 0
+	)) {
+		trigger_error("Incorrect or not passed 'csrf_token' in POST request", E_USER_ERROR);
+		exit(255);
+	}
+}
+
+unset($user, $password, $authorization, $return);
+
