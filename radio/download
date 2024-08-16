@@ -1,0 +1,12 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`/usr/bin/basename ${FILE}`
+
+/usr/bin/killall -SIGTERM wget
+
+export TZ='Europe/Moscow'
+DATE=`/usr/bin/date "+%u-%H-%d.%m.%g"`
+/usr/bin/wget -O "${DIR}/mp3/${DATE}.mp3" https://silverrain.hostingradio.ru/silver128.mp3
+
