@@ -98,7 +98,6 @@ export WEB_SERVER_PASSWORD=`/usr/bin/apg -n 1 -m 6 -x 6 -M NCL`
 exit $?
 
 <?php start:
-header("X-Frame-Options: DENY");
 
 $user = getenv('WEB_SERVER_USER', true);
 if(!is_string($user)) {
@@ -144,25 +143,6 @@ if ($return !== true) {
 	http_response_code(401);
 	header('WWW-Authenticate: Basic realm="Access to the php built-in web server", charset="UTF-8"');
 	exit(0);
-}
-
-$return = base64_encode("{$user}:{$password}");
-$return = md5($return);
-define('CSRF_TOKEN', $return);
-
-if(
-	isset($_SERVER["REQUEST_METHOD"])
-	&& is_string($_SERVER["REQUEST_METHOD"])
-	&& $_SERVER["REQUEST_METHOD"] == 'POST'
-) {
-	if(!(
-		isset($_POST['csrf_token'])
-		&& is_string($_POST['csrf_token'])
-		&& strcmp(CSRF_TOKEN, $_POST['csrf_token']) === 0
-	)) {
-		trigger_error("Incorrect or not passed 'csrf_token' in POST request", E_USER_ERROR);
-		exit(255);
-	}
 }
 
 unset($user, $password, $authorization, $return);
