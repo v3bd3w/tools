@@ -2,7 +2,5 @@
 Web Programming Tools
 
 ```
-Next test
+Test copy text to clipboard
 ```
-##
-	Test copy to clipboard
