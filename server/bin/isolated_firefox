@@ -1,0 +1,18 @@
+#!/bin/sh
+FILE=`/usr/bin/realpath $0`
+UID=`/usr/bin/id -r -u`
+if test $UID -eq 0
+then
+	export USER="${1}"
+	export DISPLAY="${2}"
+	export XAUTHORITY="${3}"
+	export PROFILE_DIR="${4}"
+	ip netns exec isolator su -s /bin/sh -w DISPLAY,XAUTHORITY -l ${USER} -c "firefox --profile ${PROFILE_DIR}"
+else
+	PROFILE_DIR="${HOME}/.config/ilamp_firefox"
+	if test ! -d ${PROFILE_DIR}
+	then
+		mkdir -p ${PROFILE_DIR}
+	fi
+	pkexec ${FILE} ${USER} ${DISPLAY} ${XAUTHORITY} ${PROFILE_DIR}
+fi

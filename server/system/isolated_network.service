@@ -1,0 +1,12 @@
+[Unit]
+Description=Isolated network
+After=network.target
+
+[Service]
+Type=notify
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/isolated_network start
+ExecStop=/usr/local/sbin/isolated_network stop
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,12 @@
+#!/bin/sh
+FILE=`/usr/bin/realpath $0`
+UID=`/usr/bin/id -r -u`
+if test $UID -eq 0
+then
+	export USER="${1}"
+	export DISPLAY="${2}"
+	export XAUTHORITY="${3}"
+	ip netns exec isolator qterminal 
+else
+	pkexec ${FILE} ${USER} ${DISPLAY} ${XAUTHORITY} ${PROFILE_DIR}
+fi

@@ -1,0 +1,185 @@
+#!/bin/sh
+
+# initialization block {{{
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+ERROR=0
+
+TTY=`/usr/bin/tty`
+if test $? -ne 0
+then
+	TTY=""
+fi
+
+# }}}
+
+# help block {{{
+HELP="
+Description: Create and delete network namespace with peer devices
+Usage: ./${BASENAME} <start|stop>
+"
+
+if test -z "${1}" -o "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+# }}}
+
+# notice_echo function {{{
+notice_echo () 
+{
+	if test -z "${TTY}"
+	then
+		logger -p user.notice -t "${BASENAME}" "${1}"
+	else
+		echo  "\nNOTICE\t${BASENAME}: ${1}"
+	fi
+}
+# }}}
+
+# error_echo function {{{
+error_echo () 
+{
+	if test -z "${TTY}"
+	then
+		logger -p user.err -t "${BASENAME}" "${1}"
+	else
+		echo  "\nERROR\t${BASENAME}: ${1}" >&2
+	fi
+}
+# }}}
+
+# start function {{{
+start ()
+{
+	COMMAND="/usr/bin/ip netns add isolator"
+	notice_echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		ERROR=255
+		error_echo "can't create a new named network namespace"
+		stop 0
+		return
+	fi
+
+	for COMMAND in \
+"/usr/bin/ip link add veth0a type veth peer name veth0b" \
+"/usr/bin/ip link set veth0b netns isolator"
+	do
+		notice_echo "${COMMAND}"
+		$COMMAND
+		if test $? -ne 0
+		then
+			ERROR=255
+			error_echo "can't create a new network virtual devices"
+			stop 1
+			return
+		fi
+	done
+	
+	for COMMAND in \
+"${IN_ISOLATOR} /usr/sbin/ifconfig lo up 127.0.0.1/8" \
+"${IN_ISOLATOR} /usr/sbin/ifconfig veth0b up 192.168.0.2/24" \
+"/usr/sbin/ifconfig veth0a up 192.168.0.1/24"
+	do
+		notice_echo "${COMMAND}"
+		$COMMAND
+		if test $? -ne 0
+		then
+			ERROR=255
+			error_echo "can't set up network virtual devices"
+			stop 2
+			return
+		fi
+	done
+}
+# }}}
+
+# stop function {{{
+stop ()
+{
+	STAGE=$1
+
+	if test $STAGE -ge 3
+	then
+		for COMMAND in \
+	"${IN_ISOLATOR} /usr/sbin/ifconfig veth0b down" \
+	"/usr/sbin/ifconfig veth0a down"
+		do
+			notice_echo "${COMMAND}"
+			$COMMAND
+			if test $? -ne 0
+			then
+				ERROR=255
+				error_echo "can't set down network virtual devices"
+			fi
+		done
+	fi
+
+	if test $STAGE -ge 2
+	then
+		COMMAND="${IN_ISOLATOR} /usr/bin/ip link delete dev veth0b"
+		notice_echo "${COMMAND}"
+		$COMMAND
+		if test $? -ne 0
+		then
+			ERROR=255
+			error_echo "can't delete network virtual devices"
+		fi
+	fi
+
+	if test $STAGE -ge 1
+	then
+		COMMAND="/usr/bin/ip netns delete isolator"
+		notice_echo "${COMMAND}"
+		$COMMAND
+		if test $? -ne 0
+		then
+			ERROR=255
+			error_echo "can't delete named network namespace"
+		fi
+	fi
+}
+# }}}
+
+# routing block {{{
+IN_ISOLATOR="/usr/bin/ip netns exec isolator"
+case "${1}" in
+	start)
+		start
+		if test $ERROR -ne 0
+		then
+			error_echo "can't start isolated network"
+		else
+			if test -z "${TTY}"
+			then
+				/usr/bin/systemd-notify --ready --status="isolated network creating complete"
+			fi
+		fi
+		;;
+	stop)
+		stop 255
+		if test $ERROR -ne 0
+		then
+			error_echo "can't correct stop isolated network"
+		else
+			if test -z "${TTY}"
+			then
+				/usr/bin/systemd-notify --ready --status="isolated network stoped"
+			fi
+		fi
+		;;
+	*)
+		ERROR=255
+		error_echo "incorrect command line argument"
+		;;
+esac
+# }}}
+
+exit $ERROR
+

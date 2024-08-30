@@ -1,0 +1,126 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+HELP="
+Description: Create database and user in mariadb.
+Usage: ${BASENAME} <create|delete> <database> <user> <password>
+"
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+create_database ()
+{
+	notice "Create database and user in mariadb"
+	
+	DATABASE="${1}"
+	USER="${2}"
+	PASSWORD="${3}"
+	### /usr/bin/apg -n 1 -m 8 -x 8 -M NCL	
+
+	QUERY="
+CREATE DATABASE \`${DATABASE}\`;
+CREATE USER \`${USER}\`@\`localhost\` IDENTIFIED BY '${PASSWORD}';
+GRANT ALL ON \`${DATABASE}\`.* TO \`${USER}\`@\`localhost\`;
+"
+	/usr/bin/echo "${QUERY}" | /usr/bin/mysql -v
+	if test $? -ne 0
+	then
+		error "Can't create database or user"
+		return 255
+	fi
+	return 0
+}
+
+delete_database ()
+{
+	notice "Delete database and user from mariadb"
+	
+	DATABASE="${1}"
+	USER="${2}"
+	STATUS=0
+	
+	QUERY="DROP DATABASE \`${DATABASE}\`;"
+	/usr/bin/echo "${QUERY}" | /usr/bin/mysql -v
+	if test $? -ne 0
+	then
+		error "Can't delete database"
+		STATUS=255
+	fi
+	
+	QUERY="DROP USER \`${USER}\`@\`localhost\`;"
+	/usr/bin/echo "${QUERY}" | /usr/bin/mysql -v
+	if test $? -ne 0
+	then
+		error "Can't delete user"
+		STATUS=255
+	fi
+	
+	return $STATUS
+}
+
+if test -z "${1}"
+then
+	error "Command is not passed"
+	exit 255
+fi
+
+case ${1} in
+	"create")
+		if test -z "${2}"
+		then
+			error "Database name is not passed"
+			exit 255
+		fi
+		if test -z "${3}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		if test -z "${4}"
+		then
+			error "Password is not passed"
+			exit 255
+		fi
+		
+		create_database "${2}" "${3}" "${4}"
+		
+		;;
+	"delete")
+		if test -z "${2}"
+		then
+			error "Database name is not passed"
+			exit 255
+		fi
+		if test -z "${3}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		delete_database "${2}" "${3}"
+		
+		;;
+	*)
+		error "Unsupported command"
+		exit 255
+		;;
+esac
+exit $?

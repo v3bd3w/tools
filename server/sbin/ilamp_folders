@@ -1,0 +1,99 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+HELP="
+Description: Create folders for 'ilamp' site.
+Usage: ${BASENAME} <create|delete> <user_name>
+"
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+create_folders ()
+{
+	notice "Create folders for site"
+	USER="${1}"
+	for COMMAND in \
+"/usr/bin/mkdir -m 750 /srv/${USER}" \
+"/usr/bin/chown root:${USER} /srv/${USER}" \
+"/usr/bin/mkdir -m 750 /srv/${USER}/log" \
+"/usr/bin/chown root:${USER} /srv/${USER}/log" \
+"/usr/bin/mkdir -m 770 /srv/${USER}/www" \
+"/usr/bin/chown root:${USER} /srv/${USER}/www" \
+"/usr/bin/mkdir -m 770 /srv/${USER}/mail" \
+"/usr/bin/chown root:${USER} /srv/${USER}/mail"
+	do
+		echo "${COMMAND}"
+		$COMMAND
+		if test $? -ne 0
+		then
+			error "exec ${COMMAND} error"
+			return 255
+		fi
+	done
+	return 0
+}
+
+delete_folders ()
+{
+	notice "Delete site folders"
+	USER="${1}"
+	/usr/bin/rm -r -v /srv/${USER}
+	if test $? -ne 0
+	then
+		echo "Can't delete folders"
+		return 255
+	fi
+	return 0
+}
+
+if test -z "${1}"
+then
+	error "Command is not passed"
+	exit 255
+fi
+
+case ${1} in
+	"create")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		create_folders "${2}"
+		
+		;;
+	"delete")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		delete_folders "${2}"
+		
+		;;
+	*)
+		error "Unsupported command"
+		exit 255
+		;;
+esac
+exit $?

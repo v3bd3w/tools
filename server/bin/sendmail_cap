@@ -1,0 +1,60 @@
+#!/usr/bin/php
+<?php
+define('SERVER_DIR_NAME', '/srv');
+
+$contents = file_get_contents("php://stdin");
+if (!is_string($contents)) {
+	trigger_error("can't get contents from stdin", E_USER_ERROR);
+	exit(255);
+}
+
+$uid = posix_getuid();
+if (!is_int($uid)) {
+	trigger_error("can't get uid", E_USER_ERROR);
+	exit(255);
+}
+
+$a = posix_getpwuid($uid);
+if (!is_array($a)) {
+	trigger_error("can't get info about a user by user id", E_USER_ERROR);
+	exit(255);
+}
+$user_name = $a['name'];
+$mail_dir_name = SERVER_DIR_NAME."/{$user_name}/mail";
+
+if(!(
+	file_exists($mail_dir_name)
+	&& is_dir($mail_dir_name) 
+	&& is_writable($mail_dir_name)
+)) {
+	trigger_error("can't use mail directory", E_USER_ERROR);
+	exit(255);	
+}
+
+
+$date = date("Y.m.d-H:i.s");
+$prefix = "{$date}";
+
+$string = '1234567890QWERTYUIOPASDFGHJKLZXCVBNM1234567890';
+$id = '';
+$max = strlen($string) - 1;
+for($i = 0; $i < 4; $i++) {
+	$number = rand(0, $max);
+	$id = $id . substr($string, $number, 1);
+}
+
+$mail_file_name = "{$mail_dir_name}/{$prefix}+{$id}";
+$r = file_put_contents($mail_file_name, $contents);
+if (!is_int($r)) {
+	trigger_error("can't put mail content to file", E_USER_ERROR);
+	exit(255);
+}
+
+$r = chmod($mail_file_name, 0400);
+if (!$r) {
+    trigger_error("can't change mode to mail file", E_USER_ERROR);
+    exit(255);
+}
+
+exit(0);
+

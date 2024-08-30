@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Isolated Root Terminal
+Exec=/usr/local/bin/isolated_root_terminal
+Icon=utilities-terminal
+StartupNotify=false
+Terminal=false
+Type=Application
+Categories=System;

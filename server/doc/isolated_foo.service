@@ -1,0 +1,7 @@
+[Unit]
+Requires=isolated_network.service
+After=isolated_network.service
+
+[Service]
+NetworkNamespacePath=/run/netns/isolator
+

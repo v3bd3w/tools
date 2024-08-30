@@ -1,0 +1,188 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+HELP="
+Description: Create or delete  user, database, folders, host with specific options for ILAMP (Isolated Linux Apache MariaDB PHP).
+Usage: ${BASENAME} <create|delete> <user_name>
+"
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+error ()
+{
+	/usr/bin/echo -e -n "\nERROR: ${BASENAME} - ${1}\n" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo -e -n "\n${BASENAME} - ${1}\n"
+	return 0
+}
+
+create ()
+{
+	USER="${1}"
+	GROUP="${1}"
+	HOME="${1}"
+	DATABASE="${1}"
+	PASSWORD='qwerty'
+	
+	STATUS=0
+	RESULT="Result info\n===========\n"
+	
+	notice "Create user"
+	COMMAND="${DIR}/ilamp_user create ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Creating user failed"
+		STATUS=255
+	else
+		RESULT="${RESULT}New on system:\n\tuser - ${USER}\n\tgroup - ${GROUP}\n"
+	fi
+	
+	notice "Create folders"
+	COMMAND="${DIR}/ilamp_folders create ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Creating folders failed"
+		STATUS=255
+	else
+		RESULT="${RESULT}New folders:\n\t/srv/${USER}/www\n\t/srv/${USER}/mail\n\t/srv/${USER}/log\n"
+	fi
+	
+	PASSWORD=`/usr/bin/apg -n 1 -m 8 -x 8 -M NCL`
+	if test -z "${PASSWORD}"
+	then
+		error "Can't generate password"
+		STATUS=255
+		PASSWORD='qwerty'
+	fi
+	
+	notice "Create database"
+	COMMAND="${DIR}/ilamp_database create ${USER} ${USER} ${PASSWORD}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Creating database failed"
+		STATUS=255
+	else
+		RESULT="${RESULT}New in mariadb:\n\tdatabase - ${USER}\n\tuser - ${USER}\n\tpassword - ${PASSWORD}\n"
+	fi
+	
+	notice "Create host"
+	COMMAND="${DIR}/ilamp_host create ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Creating host failed"
+		STATUS=255
+	else
+		RESULT="${RESULT}New in /etc/hosts:\n\t${USER}.localhost\nNew in apache:\n\t${USER}.localhost\n"
+	fi
+	
+	/usr/bin/echo -e "\n${RESULT}"
+	return $STATUS
+}
+
+delete ()
+{
+	USER="${1}"
+	GROUP="${1}"
+	HOME="${1}"
+	DATABASE="${1}"
+	
+	STATUS=0
+	
+	notice "Delete host"
+	COMMAND="${DIR}/ilamp_host delete ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Delete host failed"
+		STATUS=255
+	fi
+	
+	notice "Delete database"
+	COMMAND="${DIR}/ilamp_database delete ${USER} ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Delete database failed"
+		STATUS=255
+	fi
+	
+	notice "Delete folders"
+	COMMAND="${DIR}/ilamp_folders delete ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Delete folders failed"
+		STATUS=255
+	fi
+	
+	notice "Delete user"
+	COMMAND="${DIR}/ilamp_user delete ${USER}"
+	/usr/bin/echo "${COMMAND}"
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Delete user failed"
+		STATUS=255
+	fi
+	
+	return $STATUS
+}
+
+if test -z "${1}"
+then
+	error "Command is not passed"
+	exit 255
+fi
+
+case ${1} in
+	"create")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		create "${2}"
+		
+		;;
+	"delete")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		delete "${2}"
+		
+		;;
+	*)
+		error "Unsupported command"
+		exit 255
+		;;
+esac
+if test $? -ne 0
+then
+	error "Script execution error present. Be careful."
+fi
+exit $?

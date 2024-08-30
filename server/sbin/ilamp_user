@@ -1,0 +1,99 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+HELP="
+Description: Add user to the system with specific options for 'ilamp'.
+Usage: ${BASENAME} <create|delete> <user_name>
+"
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+create_user ()
+{
+	notice "Create user on system"
+	LOGIN="${1}"
+	COMMAND="/usr/sbin/useradd \
+		--comment '' \
+		--home-dir /srv/${LOGIN} \
+		-K USERGROUPS_ENAB=yes -K UID_MIN=33000 -K GID_MIN=33000 \
+		--no-create-home \
+		--shell /usr/sbin/nologin \
+		--user-group \
+		${LOGIN}
+	"
+	echo $COMMAND
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Can't create user on system"
+		return 255
+	fi
+	return 0
+}
+
+delete_user ()
+{
+	notice "Delete user from system"
+	LOGIN="${1}"
+	COMMAND="/usr/sbin/userdel ${LOGIN}"
+	echo $COMMAND
+	$COMMAND
+	if test $? -ne 0
+	then
+		error "Can't delete user from system"
+		return 255
+	fi
+	return 0
+}
+
+if test -z "${1}"
+then
+	error "Command is not passed"
+	exit 255
+fi
+
+case ${1} in
+	"create")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		create_user "${2}"
+		
+		;;
+	"delete")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		delete_user "${2}"
+		
+		;;
+	*)
+		error "Unsupported command"
+		exit 255
+		;;
+esac
+exit $?

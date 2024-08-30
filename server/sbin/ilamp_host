@@ -1,0 +1,154 @@
+#!/bin/sh
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+HELP="
+Description: Add host to apache and to /etc/hosts with specific options for 'ilamp'.
+Usage: ${BASENAME} <create|delete> <user_name>
+"
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+create_host ()
+{
+	notice "Create host on system and apache"
+	USER="${1}"
+	STATUS=0
+	
+	notice "Append '127.0.0.1	${USER}.localhost' to /etc/hosts"
+	/usr/bin/echo -e "127.0.0.1\t${USER}.localhost" >> /etc/hosts
+	if test $? -ne 0
+	then
+		error "Can't append hostname to /etc/hosts"
+		STATUS=255
+	fi
+	
+	TEXT="<VirtualHost 127.0.0.1:80>
+	ServerName ${USER}
+	AssignUserID ${USER} ${USER}
+	ServerAdmin webmaster@localhost
+	DocumentRoot /srv/${USER}/www
+	ErrorLog /srv/${USER}/log/error.log
+	CustomLog /srv/${USER}/log/access.log combined
+</VirtualHost>"
+	/usr/bin/echo "${TEXT}"	>> /etc/apache2/sites-available/${USER}.localhost.conf
+	if test $? -ne 0
+	then
+		error "Can't create /etc/apache2/sites-available/${USER}.localhost.conf"
+		STATUS=255
+	fi
+	
+	/usr/sbin/a2ensite ${USER}.localhost
+	if test $? -ne 0
+	then
+		error "Can't enable site ${USER}.localhost"
+		STATUS 255
+	fi
+	
+	/usr/bin/systemctl restart isolated_apache2
+	if test $? -ne 0
+	then
+		error "Can't restart isolated apache"
+		STATUS=255
+	fi
+	
+	return $STATUS
+}
+
+delete_host ()
+{
+	notice "Delete host from system and apache"
+	USER="${1}"
+	STATUS=0
+	
+	TEMP=`/usr/bin/mktemp`
+	if test -z "${TEMP}"
+	then
+		error "Can't create temporary file"
+		STATUS=255
+	fi
+	
+	notice "Delete '127.0.0.1	${USER}.localhost' from /etc/hosts"	
+	(/usr/bin/cat /etc/hosts | /usr/bin/grep  -v ${USER}\.localhost > "${TEMP}") && \
+	(/usr/bin/cat "${TEMP}" > /etc/hosts) && \
+	/usr/bin/rm "${TEMP}"
+	if test $? -ne 0
+	then
+		error "Can't delete hostname from /etc/hosts"
+		STATUS=255
+	fi
+	
+	/usr/sbin/a2dissite ${USER}.localhost
+	if test $? -ne 0
+	then
+		error "Can't disable site ${USER}.localhost"
+		STATUS=255
+	fi
+	
+	/usr/bin/rm -v /etc/apache2/sites-available/${USER}.localhost.conf
+	if test $? -ne 0
+	then
+		error "Can't delete /etc/apache2/sites-available/${USER}.localhost.conf"
+		STATUS=255
+	fi
+	
+	/usr/bin/systemctl restart isolated_apache2
+	if test $? -ne 0
+	then
+		error "Can't restart isolated apache"
+		STATUS=255
+	fi
+	
+	return $STATUS
+}
+
+if test -z "${1}"
+then
+	error "Command is not passed"
+	exit 255
+fi
+
+case ${1} in
+	"create")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		create_host "${2}"
+		
+		;;
+	"delete")
+		if test -z "${2}"
+		then
+			error "User name is not passed"
+			exit 255
+		fi
+		
+		delete_host "${2}"
+		
+		;;
+	*)
+		error "Unsupported command"
+		exit 255
+		;;
+esac
+exit $?

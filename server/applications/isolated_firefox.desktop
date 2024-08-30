@@ -1,0 +1,9 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=Isolated FireFox
+Exec=/usr/local/bin/isolated_firefox
+Icon=firefox-esr
+StartupNotify=true
+Terminal=false
+Type=Application
+Categories=Network;
