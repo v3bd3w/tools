@@ -1,0 +1,9 @@
+## Swap
+UUID=${SWAP_UUID} none swap sw 0 0
+
+## Root   
+UUID=${ROOT_UUID} / ext4 errors=remount-ro 0 1
+
+## Home
+#UUID= /home ext4 defaults 0 2
+

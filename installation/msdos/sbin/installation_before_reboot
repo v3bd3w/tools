@@ -1,0 +1,15 @@
+#!/bin/sh -e
+
+echo "Enter root password in new system"
+/usr/bin/passwd
+
+/usr/bin/apt update
+/usr/bin/apt upgrade
+
+/usr/bin/apt install grub-pc linux-image-amd64 firmware-linux firmware-linux-nonfree firmware-misc-nonfree firmware-realtek
+/usr/bin/apt install net-tools wpasupplicant network-manager hdparm psmisc screen vim mc zip unrar
+/usr/bin/cp /usr/local/etc/hdparm.conf /etc/
+
+/usr/sbin/grub-install ${GRUB_DEVICE}
+/usr/sbin/update-grub
+
