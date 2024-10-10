@@ -1,0 +1,161 @@
+#!/bin/sh
+#<?php ob_end_clean(); goto start; ?>
+
+WEB_SERVER_CONFIG="${HOME}/.config/v3bd3w/8080.sh"
+
+FILE=`/usr/bin/realpath $0`
+DIR=`/usr/bin/dirname ${FILE}`
+BASENAME=`basename ${FILE}`
+
+WEB_SERVER_HOST="127.0.0.1"
+WEB_SERVER_PORT="8080"
+WEB_SERVER_DOCROOT="${DIR}/docroot"
+
+# Help block
+#{{{
+
+HELP="
+Description: The script starts the php built-in web server with authorization.
+Usage: ${BASENAME} [user] [docroot] [config] [host] [port] [password]
+
+Config file override default settings.
+Command line arguments override configuration file settings.
+If script started by root, argument 'user' required.
+Argument 'password' never required.
+
+Examples:
+
+	Set docroot and disable config
+# ./start www-data /var/www/html /dev/null
+
+	Set custom password
+$ ./start \"\" \"\" \"\" \"\" \"\" "MyPassword"
+"
+
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+#}}}
+
+COMMAND_LINE_USER="${1}"
+COMMAND_LINE_DOCROOT="${2}"
+COMMAND_LINE_CONFIG="${3}"
+COMMAND_LINE_HOST="${4}"
+COMMAND_LINE_PORT="${5}"
+COMMAND_LINE_PASSWORD="${6}"
+
+# Echo functions
+#{{{
+
+error ()
+{
+	/usr/bin/echo "Error: ${BASENAME} - ${1}" >&2
+	return 255
+}
+
+notice ()
+{
+	/usr/bin/echo "${BASENAME} - ${1}"
+	return 0
+}
+
+#}}}
+
+# Change user and load config
+#{{{
+
+UID=`/usr/bin/id -r -u`
+GID=`/usr/bin/id -r -g`
+
+if test $UID -eq 0 -o $GID -eq 0
+then
+	if test -z "${COMMAND_LINE_USER}"
+	then
+		error "The argument 'user' not passsed in command line"
+		exit 255
+	fi
+	
+	export WEB_SERVER_USER="${COMMAND_LINE_USER}"
+	
+	/usr/bin/su -P -s /bin/sh -l "${WEB_SERVER_USER}" -c "${FILE} '${COMMAND_LINE_USER}' '${COMMAND_LINE_DOCROOT}' '${COMMAND_LINE_CONFIG}' '${COMMAND_LINE_HOST}' '${COMMAND_LINE_PORT}' '${COMMAND_LINE_PASSWORD}'"
+	exit 0
+fi
+
+if test -n "${COMMAND_LINE_CONFIG}"
+then
+	WEB_SERVER_CONFIG="${COMMAND_LINE_CONFIG}"
+fi
+
+/usr/bin/echo -n -e "\nLoad config '${WEB_SERVER_CONFIG}'"
+if test -r "${WEB_SERVER_CONFIG}"
+then
+	/usr/bin/echo " [ exists and readable ]"
+	set -a allexport
+	. "${WEB_SERVER_CONFIG}"
+else
+	/usr/bin/echo " [ not exists or not readable ]"
+fi
+
+#}}}
+
+# Configure user, password, hash
+#{{{
+export WEB_SERVER_USER=`/usr/bin/whoami`
+
+if test -n "${COMMAND_LINE_PASSWORD}"
+then 
+	export WEB_SERVER_PASSWORD="${COMMAND_LINE_PASSWORD}"
+else
+	if test -n "${WEB_SERVER_HASH}"
+	then
+		export WEB_SERVER_PASSWORD=""
+	else
+		export WEB_SERVER_PASSWORD=`/usr/bin/apg -n 1 -m 6 -x 6 -M NCL`
+	fi
+fi
+
+if test -n "${WEB_SERVER_PASSWORD}"
+then
+	BASE64=`/usr/bin/echo -n "${WEB_SERVER_USER}:${WEB_SERVER_PASSWORD}" | /usr/bin/base64`
+	export WEB_SERVER_HASH=`/usr/bin/echo -n "${BASE64}" | /usr/bin/md5sum - | /usr/bin/grep -P '[\d\w]+' -o`
+fi
+
+/usr/bin/echo "User '${WEB_SERVER_USER}' [ WEB_SERVER_USER ]"
+/usr/bin/echo "Password '${WEB_SERVER_PASSWORD}' [ WEB_SERVER_PASSWORD ]"
+/usr/bin/echo "Hash md5( base64( 'user:password' ) ) '${WEB_SERVER_HASH}' [ WEB_SERVER_HASH ]"
+
+#}}}
+
+# Configure host, port, docroot
+#{{{
+
+if test -n "${COMMAND_LINE_HOST}"
+then
+	export WEB_SERVER_HOST="${COMMAND_LINE_HOST}"
+fi
+
+if test -n "${COMMAND_LINE_PORT}"
+then
+	export WEB_SERVER_PORT="${COMMAND_LINE_PORT}"
+fi
+
+if test -n "${COMMAND_LINE_DOCROOT}"
+then
+	export WEB_SERVER_DOCROOT="${COMMAND_LINE_DOCROOT}"
+fi
+
+/usr/bin/echo "Host '${WEB_SERVER_HOST}' [ WEB_SERVER_USER ]"
+/usr/bin/echo "Port '${WEB_SERVER_PORT}' [ WEB_SERVER_PORT ]"
+/usr/bin/echo "Docroot '${WEB_SERVER_DOCROOT}' [ WEB_SERVER_DOCROOT ]"
+
+#}}}
+
+/usr/bin/php -d auto_prepend_file=${FILE} -t ${WEB_SERVER_DOCROOT} -S ${WEB_SERVER_HOST}:${WEB_SERVER_PORT}
+exit $?
+
+<?php start:
+require(__DIR__.'/include/block/authorization.php');
+

@@ -1,0 +1,37 @@
+#!/bin/sh
+
+HELP="
+Description: The script generate hash md5( base64( 'user:password' ) )
+Usage: start <user> [password]
+"
+
+if test "${1}" = "-h" -o "${1}" = "--help"
+then
+	echo "${HELP}"
+	exit 0
+fi
+
+if test -z "${1}"
+then
+	/usr/bin/echo "Error: 'user' not passed in command line" >&2
+	exit 255
+fi
+	
+USER="${1}"
+if test -n "${2}"
+then
+	PASSWORD="${2}"
+else
+	PASSWORD=`/usr/bin/apg -n 1 -m 8 -x 8 -M NCL`
+fi
+BASE64=`/usr/bin/echo -n "${USER}:${PASSWORD}" | /usr/bin/base64`
+MD5=`/usr/bin/echo -n "${BASE64}" | /usr/bin/md5sum - | /usr/bin/grep -P '[\d\w]+' -o`
+
+TEXT="USER = ${USER}
+PASSWORD = ${PASSWORD}
+BASE64 = ${BASE64}
+MD5 = ${MD5}"
+
+echo "${TEXT}"
+exit 0
+
