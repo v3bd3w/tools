@@ -1,0 +1,30 @@
+{
+	"manifest_version": 2
+	
+	,"version": "1.0"
+	,"name": "SEO"
+	,"description": "DuckDuckGo search result parser and saver"
+	,"icons": {
+		"48": "icons/icon-48.png"
+	}
+	
+	,"commands": {
+		"content": {
+			"description": "Execute content script"
+			,"suggested_key": {
+				"default": "Ctrl+Shift+1"
+			}
+		}
+	}	
+	
+	,"background": {
+		"scripts": ["background.js"]
+	}
+	
+	,"permissions": [
+		"*://*/*"
+		,"tabs"
+		,"scripting"
+	]
+}
+
