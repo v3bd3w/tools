@@ -1,0 +1,74 @@
+#!/usr/bin/perl
+
+if( ($ARGV[0] eq '-h') || ($ARGV[0] eq '--help') ) {
+	print('
+Description: Script create unsigned xpi file
+Usage:
+	In about:config set
+	xpinstall.signatures.required = false
+	
+	In manifest.json set
+	"browser_specific_settings": {
+		"gecko": {
+			"id": "test@example.com"
+			,"strict_min_version": "45.0"
+		}
+	}
+
+	Chage dir into extension and exec
+	xpi-create test@example.com.xpi
+');
+	exit(0);
+}
+
+$xpi_name = "../$ARGV[0]";
+print("Using xpi name - $xpi_name\n");
+
+`rm -rf ./META-INF`;
+$output = `find`;
+@PATH = split("\n", $output);
+
+$manifest = "Manifest-Version: 1.0\n\n";
+foreach(@PATH) {
+	$path = $_;
+	$return = system("test -f $path");
+	if($return == 0) {
+		$file = $path;
+		$file =~ s/^\.\///g;
+		$manifest .= "Name: $file\n";
+		
+		$manifest .= "Digest-Algorithms: SHA1 SHA256\n";
+		
+		$hash = `openssl dgst -binary -sha1 $path | base64`;
+		$hash =~ s/^\s+|\s+$//g;
+		$manifest .= "SHA1-Digest: $hash\n";
+		
+		$hash = `openssl dgst -binary -sha256 $path | base64`;
+		$hash =~ s/^\s+|\s+$//g;
+		$manifest .= "SHA256-Digest: $hash\n";
+		
+		$manifest .= "\n";
+	}
+}
+
+`mkdir ./META-INF`;
+open(FH, '>', './META-INF/manifest.mf') or die $!;
+print(FH $manifest);
+close(FH);
+
+$mozilla = "Signature-Version: 1.0\n";
+
+$hash = `openssl dgst -binary -sha1 ./META-INF/manifest.mf | base64`;
+$hash =~ s/^\s+|\s+$//g;
+$mozilla .= "SHA1-Digest-Manifest: $hash\n";
+
+$hash = `openssl dgst -binary -sha1 ./META-INF/manifest.mf | base64`;
+$hash =~ s/^\s+|\s+$//g;
+$mozilla .= "SHA256-Digest-Manifest: $hash\n";
+
+open(FH, '>', './META-INF/mozilla.sf') or die $!;
+print(FH $mozilla);
+close(FH);
+
+`zip -r $xpi_name ./*`
+
